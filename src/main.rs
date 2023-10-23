@@ -1,5 +1,9 @@
 use poem::{listener::TcpListener, Route, endpoint::StaticFilesEndpoint};
 use poem_openapi::{param::Query, payload::{PlainText, Html}, OpenApi, OpenApiService};
+
+use handlebars::Handlebars;
+use serde_json::json;
+
 use kv_log_macro::*;
 
 const IP: &str = "0.0.0.0";
@@ -7,7 +11,10 @@ const PORT: &str = "3000";
 
 const HTML: &str = include_str!("static/index.html");
 
-struct Api;
+#[derive(Default)]
+struct Api {
+    handlebars: Handlebars<'static>,
+}
 
 #[OpenApi]
 impl Api {
@@ -25,7 +32,9 @@ impl Api {
     async fn index(&self) -> Html<String> {
         info!("Request at \"/\"");
 
-        Html(HTML.into())
+        let temporary_json = json!({"name": "foo"});
+
+        Html(self.handlebars.render_template(HTML, &temporary_json).unwrap())
     }
 }
 
@@ -38,7 +47,7 @@ async fn main() -> Result<(), std::io::Error> {
     info!("Listening on: http://{listen_address}");
 
     let api_service =
-        OpenApiService::new(Api, "Rust & HTMX", "1.0").server("http://localhost:3000/");
+        OpenApiService::new(Api::default(), "Rust & HTMX", "1.0").server("http://localhost:3000/");
 
     let ui = api_service.swagger_ui();
 
