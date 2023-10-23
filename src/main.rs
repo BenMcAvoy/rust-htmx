@@ -33,7 +33,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let listen_address = format!("{IP}:{PORT}");
 
-    info!("Listening info: http://{listen_address}");
+    info!("Listening on: http://{listen_address}");
 
     let api_service =
         OpenApiService::new(Api, "Rust & HTMX", "1.0").server("http://localhost:3000/");
