@@ -5,6 +5,8 @@ use kv_log_macro::*;
 const IP: &str = "0.0.0.0";
 const PORT: &str = "3000";
 
+const HTML: &str = include_str!("static/index.html");
+
 struct Api;
 
 #[OpenApi]
@@ -23,7 +25,7 @@ impl Api {
     async fn index(&self) -> Html<String> {
         info!("Request at \"/\"");
 
-        Html("<h1>Film list</h1>".to_string())
+        Html(HTML.into())
     }
 }
 
