@@ -1,8 +1,12 @@
+use std::sync::{Mutex, Arc};
+
 use poem::{listener::TcpListener, Route, endpoint::StaticFilesEndpoint};
 use poem_openapi::{param::Query, payload::{PlainText, Html}, OpenApi, OpenApiService};
 
 use handlebars::Handlebars;
 use serde_json::json;
+
+use serde::{Serialize, Deserialize};
 
 use kv_log_macro::*;
 
@@ -14,6 +18,18 @@ const HTML: &str = include_str!("static/index.html");
 #[derive(Default)]
 struct Api {
     handlebars: Handlebars<'static>,
+    data: Arc<Data>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Film {
+    name: String,
+    description: String,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct Data {
+    films: Vec<Film>
 }
 
 #[OpenApi]
@@ -32,7 +48,14 @@ impl Api {
     async fn index(&self) -> Html<String> {
         info!("Request at \"/\"");
 
-        let json = json!({"people": [ "Yehuda Katz", "Alan Johnson", "Charles Jolley" ]});
+        // let json = serde_json::to_string(data).unwrap();
+        let json = json!({
+            "films": [
+                "Film1",
+                "Film2",
+                "Film3",
+            ]
+        });
 
         let response = self.handlebars.render_template(HTML, &json);
 
