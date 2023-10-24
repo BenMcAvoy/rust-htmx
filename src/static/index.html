@@ -12,7 +12,11 @@
 </head>
 
 <body>
-  <h1>{{ name }}</h1>
+  <ul class="people_list">
+    {{#each people}}
+      <li>{{this}}</li>
+    {{/each}}
+  </ul>
 </body>
 
 </html>
