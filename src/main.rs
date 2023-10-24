@@ -1,12 +1,18 @@
-use std::sync::{Mutex, Arc};
+use std::{path::PathBuf, process::exit, time::Duration};
 
-use poem::{listener::TcpListener, Route, endpoint::StaticFilesEndpoint};
-use poem_openapi::{param::Query, payload::{PlainText, Html}, OpenApi, OpenApiService};
+use poem::{endpoint::StaticFilesEndpoint, listener::TcpListener, Route};
+use poem_openapi::{
+    param::Query,
+    payload::{Html, PlainText},
+    OpenApi, OpenApiService,
+};
+
+use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 
 use handlebars::Handlebars;
 use serde_json::json;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use kv_log_macro::*;
 
@@ -15,10 +21,18 @@ const PORT: &str = "3000";
 
 const HTML: &str = include_str!("static/index.html");
 
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize)]
+struct Config {
+    username: String,
+    password: String,
+    port: u16,
+    host: String,
+    name: String,
+}
+
 struct Api {
     handlebars: Handlebars<'static>,
-    data: Arc<Data>,
+    pool: Pool<MySql>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -29,7 +43,7 @@ struct Film {
 
 #[derive(Serialize, Deserialize, Default)]
 struct Data {
-    films: Vec<Film>
+    films: Vec<Film>,
 }
 
 #[OpenApi]
@@ -61,7 +75,46 @@ impl Api {
 
         match response {
             Ok(v) => Html(v),
-            Err(e) => Html(e.to_string())
+            Err(e) => Html(e.to_string()),
+        }
+    }
+
+    pub async fn new() -> Self {
+        let cfg: Config = confy::load_path(PathBuf::from("./config.toml")).unwrap();
+
+        info!("Creating DB pool");
+
+        let address = format!(
+            "mysql://{}:{}@{}/{}",
+            cfg.username, cfg.password, cfg.host, cfg.name
+        );
+
+        if cfg.username.is_empty()
+            || cfg.password.is_empty()
+            || cfg.host.is_empty()
+            || cfg.name.is_empty()
+        {
+            error!("Not all values in `config.toml` are filled in!");
+            exit(-1);
+        }
+
+        let pool = MySqlPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(Duration::new(5, 0))
+            .connect(&address)
+            .await;
+
+        let pool = match pool {
+            Ok(v) => v,
+            Err(e) => {
+                error!("Pool error: {e}");
+                exit(-1);
+            }
+        };
+
+        Self {
+            handlebars: Handlebars::default(),
+            pool,
         }
     }
 }
@@ -72,10 +125,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     let listen_address = format!("{IP}:{PORT}");
 
-    info!("Listening on: http://{listen_address}");
-
-    let api_service =
-        OpenApiService::new(Api::default(), "Rust & HTMX", "1.0").server("http://localhost:3000/");
+    let api_service = OpenApiService::new(Api::new().await, "Rust & HTMX", "1.0")
+        .server("http://localhost:3000/");
 
     let ui = api_service.swagger_ui();
 
