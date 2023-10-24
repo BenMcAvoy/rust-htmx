@@ -32,9 +32,14 @@ impl Api {
     async fn index(&self) -> Html<String> {
         info!("Request at \"/\"");
 
-        let temporary_json = json!({"name": "foo"});
+        let json = json!({"people": [ "Yehuda Katz", "Alan Johnson", "Charles Jolley" ]});
 
-        Html(self.handlebars.render_template(HTML, &temporary_json).unwrap())
+        let response = self.handlebars.render_template(HTML, &json);
+
+        match response {
+            Ok(v) => Html(v),
+            Err(e) => Html(e.to_string())
+        }
     }
 }
 
